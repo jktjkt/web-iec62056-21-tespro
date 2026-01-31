@@ -17,9 +17,9 @@ class ElectricityMetersWidget extends LitElement {
     constructor() {
         super();
         this.meters = [];
-        this.storedReadings = [];
+        this.storedReadings = Array.from(JSON.parse(window.localStorage.getItem("storedReadings") ?? "[]"));;
+        this.fields = [];
         this.isConnected = false;
-        this.reinitPackets();
         this.port = null;
         this.portReader = null;
         this.portWriter = null;
@@ -68,10 +68,6 @@ class ElectricityMetersWidget extends LitElement {
         a.setAttribute('download', `iecmeters-${new Date().toJSON()}.json`);
         a.setAttribute('href', window.URL.createObjectURL(blob));
         a.click();
-    }
-
-    reinitPackets() {
-        this.fields = [];
     }
 
     async doConnect() {
@@ -286,7 +282,7 @@ class ElectricityMetersWidget extends LitElement {
         if (window.confirm("Delete all captured readings? This cannot be undone.")) {
             window.localStorage.removeItem("storedReadings");
             this.storedReadings = [];
-            this.reinitPackets();
+            this.fields = [];
             this.meters.forEach((meter, i) => {
                 if (meter.prettyName === null) {
                     this.meters.splice(i, 1);
