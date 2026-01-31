@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Electricity Meter Readout</title>
+  </head>
+
+  <body>
+    <div id="background">
+      <script type=module src=iec62056-21-components.js></script>
+      <iec62056-21-widget></iec62056-21-widget>
+      <script type=text/javascript>
+        customElements.whenDefined('iec62056-21-widget').then(() => {
+          const W = document.querySelector('iec62056-21-widget');
+          new Map([
+            ['T690100', 'RSP.G'],
+            ['T691454', 'RSP.H'],
+            ['T691450', 'RG1'],
+            ['T691447', 'RP+UPS'],
+            ['T691671', 'RSP.J'],
+            ['T690258', 'RSP.K'],
+            ['T690124', 'RG2'],
+            ['T690117', 'RSP.L'],
+          ]).forEach((pretty, meterId) => W.addKnownMeter(meterId, pretty));
+        });
+      </script>
+    </div>
+  </body>
+</html>
+

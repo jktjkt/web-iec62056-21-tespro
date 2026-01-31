@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Electricity Meter Readout</title>
+  </head>
+
+  <body>
+    <div id="background">
+      <button onclick=do_connect()>Connect</button>
+      <button onclick=do_readout()>Read the meter</button>
+      <button onclick=do_download() id=btn_download>Download</button>
+      <button onclick=do_disconnect()>Disconnect</button>
+      <pre id=log></pre>
+      <script type="text/javascript">
+
+var btDev;
+var tx_characteristic;
+var comm = [];
+
+function log(what) {
+  console.log(what);
+  let logElement = document.querySelector('#log');
+  logElement.appendChild(document.createTextNode('\n' + what));
+}
+
+async function do_connect() {
+  if (!navigator.bluetooth) {
+    log('Web Bluetooth is not available');
+    return;
+  }
+  log('Requesting device...');
+  const options = {
+    // acceptAllDevices: true,
+    filters: [
+      {namePrefix: 'OP-BT'}
+    ],
+    optionalServices: [0x18f0],
+  };
+  try {
+    tx_characteristic = null;
+    btDev = await navigator.bluetooth.requestDevice(options);
+    btDev.addEventListener('gattserverdisconnected', on_disconnected);
+    log('Connecting...');
+    await btDev.gatt.connect();
+    log('Connected, requesting services...');
+    service = await btDev.gatt.getPrimaryService(0x18f0);
+    log('requesting RX characteristics...');
+    rx_characteristic = await service.getCharacteristic(0x2af0);
+    log('RX characteristic: ' + rx_characteristic);
+    rx_notif = await rx_characteristic.startNotifications();
+    log('RX characteristics: notifications started');
+    rx_notif.addEventListener('characteristicvaluechanged', handle_rx);
+    log('requesting TX characteristics...');
+    tx_characteristic = await service.getCharacteristic(0x2af1);
+    log('All good, connected to ' + btDev.name);
+    refresh_stats();
+  } catch (error) {
+    log('Cannot connect: ' + error);
+  }
+}
+
+async function do_disconnect() {
+  if (!btDev) {
+    return;
+  }
+  log('Disconnecting...');
+  if (btDev.gatt.connected) {
+    btDev.gatt.disconnect();
+  } else {
+    log('Already disconnected');
+  }
+}
+
+async function handle_rx(event) {
+  let v = event.target.value;
+  let str = "";
+  for (let i = 0; i < v.byteLength; i++) {
+    str += String.fromCharCode(v.getUint8(i));
+  }
+  comm.push({
+    time: new Date().toJSON(),
+    rx: str,
+  });
+
+  refresh_stats();
+}
+
+async function do_tx(blob) {
+  let buf = new Uint8Array(blob.length)
+  for (let i = 0; i < blob.length; i++) {
+    buf[i] = blob[i].charCodeAt(0);
+  }
+  try {
+    await tx_characteristic.writeValue(buf);
+  } catch (error) {
+    log('TX failed: ' + error);
+  }
+  comm.push({
+    time: new Date().toJSON(),
+    tx: blob,
+  });
+  refresh_stats();
+}
+
+async function on_disconnected() {
+  log('Disconnected.');
+}
+
+async function do_readout() {
+  comm = [];
+  do_tx('/?!\r\n');
+  await new Promise(r => setTimeout(r, 250));
+  //do_tx('\x06050\r\n');
+}
+
+function refresh_stats() {
+  document.querySelector('#btn_download').textContent = 'Download ' + comm.length;
+}
+
+function do_download() {
+  const blob = new Blob([JSON.stringify(comm)], {type: 'text/json'});
+  const a = document.createElement('a');
+  a.setAttribute('download', `iec62056-21-comm-${new Date().toJSON()}.json`);
+  a.setAttribute('href', window.URL.createObjectURL(blob));
+  a.click();
+}
+
+      </script>
+    </div>
+  </body>
+</html>
+
