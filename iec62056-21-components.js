@@ -391,6 +391,11 @@ class ElectricityMetersWidget extends LitElement {
             const meterTypeId = res[3];
             console.log(`ID: ${meterTypeId}, new baud mode: ${new_baud_mode}`)
 
+            this.fields = [{
+                obis: 'Meter',
+                value: meterTypeId,
+            }];
+
             const readout = [0x06, 0x30, new_baud_mode.charCodeAt(0), 0x30, 0x0d, 0x0a];
             await this.serial_write(new Uint8Array(readout));
 
@@ -456,11 +461,22 @@ class ElectricityMetersWidget extends LitElement {
                     calculatedBcc &= 0x7f;
                 }
                 if (dataBcc != calculatedBcc) {
-                    throw `Checksum error: BCC from meter 0x${dataBcc.toString(16)}, calculated 0x${calculatedBcc.toString(16)}`;
+                    const msg = `Checksum error: BCC from meter 0x${dataBcc.toString(16)}, calculated 0x${calculatedBcc.toString(16)}`
+                    this.fields = [{
+                        error: true,
+                        line: msg,
+                    }, ...this.fields];
+                    throw msg;
                 }
-                console.log('Checksum with STX/ETX/BCC OK');
+                this.fields = [{
+                    obis: 'Checksum',
+                    value: 'STX/ETX/BCC OK',
+                }, ...this.fields];
             } else {
-                console.log('No STX/ETX/BCC to check');
+                this.fields = [{
+                    obis: 'Checksum',
+                    value: 'None',
+                }, ...this.fields];
             }
             this.gotMeterData(meterId, {
                 time: new Date().toJSON().json,
