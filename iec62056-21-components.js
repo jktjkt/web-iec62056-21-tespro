@@ -262,12 +262,29 @@ class ElectricityMetersWidget extends LitElement {
         `;
     }
 
-    downloadPackets() {
+    async downloadPackets() {
+        const dateish = new Date().toJSON();
+        const fileName = `iecmeters-${dateish}.json`;
         const blob = new Blob([JSON.stringify(this.storedReadings)], {type: 'text/json'});
-        const a = document.createElement('a');
-        a.setAttribute('download', `iecmeters-${new Date().toJSON()}.json`);
-        a.setAttribute('href', window.URL.createObjectURL(blob));
-        a.click();
+        const file = new File([blob], fileName);
+        const sharing = {
+            files: [file],
+            title: 'IEC Meter Readings',
+            text: `JSON with ${this.storedReadings.lenght} individual meter readings`,
+        }
+        if (navigator.canShare && navigator.canShare(sharing)) {
+            try {
+                await navigator.share(sharing);
+            } catch (error) {
+                this.error = error;
+            }
+        } else {
+            const a = document.createElement('a');
+            a.setAttribute('download', fileName);
+            const blob = new Blob([JSON.stringify(this.storedReadings)], {type: 'text/json'});
+            a.setAttribute('href', window.URL.createObjectURL(blob));
+            a.click();
+        }
     }
 
     async doConnectSerial() {
