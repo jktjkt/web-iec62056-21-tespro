@@ -71,9 +71,7 @@ class BleSerial extends EventTarget {
     txUUID = 0x2af1;
 
     _btDev = null;
-    _service = null;
     _rx_characteristic = null;
-    _rx_notif = null;
     _tx_characteristic = null;
     _rx_promise = null;
     _rx_resolve = null;
@@ -96,13 +94,13 @@ class BleSerial extends EventTarget {
             this._btDev = await navigator.bluetooth.requestDevice(options);
             this._btDev.addEventListener('gattserverdisconnected', () => { this._onDisconnected(); });
             console.log('BLE: Connecting...');
-            await this._btDev.gatt.connect();
+            let gatt = await this._btDev.gatt.connect();
             console.log('BLE: Connected, requesting services...');
-            this._service = await this._btDev.gatt.getPrimaryService(this.serviceUUID);
+            let service = await gatt.getPrimaryService(this.serviceUUID);
             console.log('BLE: requesting RX characteristics...');
-            this._rx_characteristic = await this._service.getCharacteristic(this.rxUUID);
-            console.log('BLE: RX characteristic: ' + this._rx_characteristic);
-            this._rx_notif = await this._rx_characteristic.startNotifications();
+            this._rx_characteristic = await service.getCharacteristic(this.rxUUID);
+            console.log('BLE: starting notifications...');
+            await this._rx_characteristic.startNotifications();
             // BUG: without this start-stop-start cycle, the this._onRx() would be called against the *first*
             // BleSerial instance indefinitely. Explicitly removing the event listener is not enough,
             // and neigher is using an AbortController. Unless the *first* BleSerial calls stopNotifications(),
@@ -111,12 +109,12 @@ class BleSerial extends EventTarget {
             // the BLE connection drops for some external reason. Also, one cannot call stopNotifications from
             // an event handler that's connected to 'gattserverdisconnected' because the WebBluetooth actively rejects
             // that when the BLE/GATT server is not connected. Yay.
-            await this._rx_notif.stopNotifications();
-            this._rx_notif = await this._rx_characteristic.startNotifications();
+            await this._rx_characteristic.stopNotifications();
+            await this._rx_characteristic.startNotifications();
             console.log('BLE: RX characteristics: notifications started');
             this._rx_characteristic.oncharacteristicvaluechanged = (e) => { this._onRx(e); }
             console.log('BLE: requesting TX characteristics...');
-            this._tx_characteristic = await this._service.getCharacteristic(this.txUUID);
+            this._tx_characteristic = await service.getCharacteristic(this.txUUID);
             this.readable = new _BleReadable(this);
             this.writable = new _BleWritable(this);
             await this._reset_promise('init', null);
@@ -160,7 +158,7 @@ class BleSerial extends EventTarget {
         });
     }
 
-    async _onRx() {
+    _onRx(event) {
         let v = event.target.value;
         let chunk = [];
         for (let i = v.byteOffset; i < v.byteLength; i++) {
@@ -173,9 +171,7 @@ class BleSerial extends EventTarget {
     async _onDisconnected() {
         this._reset_promise('cancel', undefined);
         this._tx_characteristic = null;
-        this._rx_notif = null;
         this._rx_characteristic = null;
-        this._service = null;
         this._btDev = null;
         this.readable = null;
         this.writable = null;
