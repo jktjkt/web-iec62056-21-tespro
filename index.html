@@ -12,9 +12,22 @@ body {
   </head>
 
   <body>
+      <script type=text/javascript>
+(function(){
+    var oldLog = console.log;
+    console.log = function (message) {
+        const logger = document.getElementById('log');
+        logger.innerHTML += `> ${message}\n`;
+        
+        oldLog.apply(console, arguments);
+    };
+})();
+      </script>
+
     <div id="background">
       <script type=module src=iec62056-21-components.js></script>
       <iec62056-21-widget></iec62056-21-widget>
+<pre id=log style="white-space: pre-wrap; font-size: 40px !important;"></pre>
       <script type=text/javascript>
         customElements.whenDefined('iec62056-21-widget').then(() => {
           const W = document.querySelector('iec62056-21-widget');

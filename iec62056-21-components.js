@@ -133,6 +133,7 @@ class BleSerial extends EventTarget {
             await this._reset_promise('init', null);
             console.log('BLE: All good, connected to ' + this._btDev.name);
         } catch (error) {
+            console.log(error);
             await this.close();
             throw error;
         }
