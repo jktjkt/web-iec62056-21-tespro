@@ -4,6 +4,10 @@ function hexify(buf) {
     return Array.from(buf).map((c) => (c > 15 ? '' : '0') + c.toString(16)).join(' ')
 }
 
+function isBluefy() {
+    return navigator.userAgent.includes('Bluefy');
+}
+
 class _BleReader {
     constructor(port) {
         this._port = port;
@@ -89,6 +93,11 @@ class BleSerial extends EventTarget {
             // ],
             optionalServices: [this.serviceUUID],
         };
+        if (isBluefy()) {
+            // If this is left in place, then the conneciton attempt will fail with a very descriptive
+            // error message, "2".
+            delete options.optionalServices;
+        }
 
         try {
             this._btDev = await navigator.bluetooth.requestDevice(options);
@@ -101,16 +110,20 @@ class BleSerial extends EventTarget {
             this._rx_characteristic = await service.getCharacteristic(this.rxUUID);
             console.log('BLE: starting notifications...');
             await this._rx_characteristic.startNotifications();
-            // BUG: without this start-stop-start cycle, the this._onRx() would be called against the *first*
-            // BleSerial instance indefinitely. Explicitly removing the event listener is not enough,
-            // and neigher is using an AbortController. Unless the *first* BleSerial calls stopNotifications(),
-            // that instance will keep receiving notifications about changes in that characteristic.
-            // It is not enough to call stopNotifications in BlePort.close(), because that one is not called when
-            // the BLE connection drops for some external reason. Also, one cannot call stopNotifications from
-            // an event handler that's connected to 'gattserverdisconnected' because the WebBluetooth actively rejects
-            // that when the BLE/GATT server is not connected. Yay.
-            await this._rx_characteristic.stopNotifications();
-            await this._rx_characteristic.startNotifications();
+            if (!isBluefy()) {
+                // BUG: without this start-stop-start cycle, the this._onRx() would be called against the *first*
+                // BleSerial instance indefinitely. Explicitly removing the event listener is not enough,
+                // and neigher is using an AbortController. Unless the *first* BleSerial calls stopNotifications(),
+                // that instance will keep receiving notifications about changes in that characteristic.
+                // It is not enough to call stopNotifications in BlePort.close(), because that one is not called when
+                // the BLE connection drops for some external reason. Also, one cannot call stopNotifications from
+                // an event handler that's connected to 'gattserverdisconnected' because the WebBluetooth actively rejects
+                // that when the BLE/GATT server is not connected. Yay.
+                await this._rx_characteristic.stopNotifications();
+                await this._rx_characteristic.startNotifications();
+            } else {
+                console.log('BLE: Bluefy detected, not doing the unreg/reg shenanigans');
+            }
             console.log('BLE: RX characteristics: notifications started');
             this._rx_characteristic.addEventListener('characteristicvaluechanged', (e) => { this._onRx(e); });
             console.log('BLE: requesting TX characteristics...');
