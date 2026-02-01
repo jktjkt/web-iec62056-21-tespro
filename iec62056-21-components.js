@@ -262,12 +262,32 @@ class ElectricityMetersWidget extends LitElement {
         `;
     }
 
-    downloadPackets() {
-        const blob = new Blob([JSON.stringify(this.storedReadings)], {type: 'text/json'});
-        const a = document.createElement('a');
-        a.setAttribute('download', `iecmeters-${new Date().toJSON()}.json`);
-        a.setAttribute('href', window.URL.createObjectURL(blob));
-        a.click();
+    async downloadPackets() {
+        const now = new Date();
+        // On Android, file name cannot end with ".json" and the file's MIME type cannot be text/json.
+        const fileName = `iecmeters-${now.toJSON()}.json.txt`;
+        const blob = new Blob([JSON.stringify(this.storedReadings)], {type: 'text/plain'});
+        const file = new File([blob], fileName, {
+            type: 'text/plain',
+            lastModified: now
+        });
+        const sharing = {
+            files: [file],
+            title: `${this.storedReadings.length} Meter Readings`,
+        }
+        if (navigator.canShare && navigator.canShare(sharing)) {
+            try {
+                await navigator.share(sharing);
+            } catch (error) {
+                this.error = error;
+            }
+        } else {
+            const a = document.createElement('a');
+            a.setAttribute('download', fileName);
+            const blob = new Blob([JSON.stringify(this.storedReadings)], {type: 'text/json'});
+            a.setAttribute('href', window.URL.createObjectURL(blob));
+            a.click();
+        }
     }
 
     async doConnectSerial() {
