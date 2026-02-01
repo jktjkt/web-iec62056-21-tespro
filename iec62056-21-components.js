@@ -231,7 +231,7 @@ class ElectricityMetersWidget extends LitElement {
         <div class=readout-container>
         <button @click=${this.clearStorage} ?disabled=${this.packetCount == 0}>Clear persistent storage</button>
         <!--button @click="${this.doConnectSerial}" ?disabled=${this.isConnected}>Connect via serial</button-->
-        <button @click="${this.doConnectBLE}" ?disabled=${this.isConnected}>Connect via BLE</button>
+        <button @click="${this.doConnectBLE}" ?disabled=${this.isConnected}>${this.isConnected ? "Connected to " + this.port._btDev.name : "Connect via BLE"}</button>
         <button @click="${this.doDisconnect}" ?disabled=${!this.isConnected}>Disconnect</button>
         <button @click="${this.downloadPackets}"">Download (${this.meters.reduce((acc, meter) => meter.data ? acc + 1 : acc, 0)} shown, ${this.storedReadings.length} stored)</button>
         <div class=readout-control>
