@@ -112,7 +112,7 @@ class BleSerial extends EventTarget {
             await this._rx_characteristic.stopNotifications();
             await this._rx_characteristic.startNotifications();
             console.log('BLE: RX characteristics: notifications started');
-            this._rx_characteristic.oncharacteristicvaluechanged = (e) => { this._onRx(e); }
+            this._rx_characteristic.addEventListener('characteristicvaluechanged', (e) => { this._onRx(e); });
             console.log('BLE: requesting TX characteristics...');
             this._tx_characteristic = await service.getCharacteristic(this.txUUID);
             this.readable = new _BleReadable(this);
