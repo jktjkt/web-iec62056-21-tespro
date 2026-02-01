@@ -35,6 +35,7 @@ class ElectricityMetersWidget extends LitElement {
         div.one-meter.seen { background-color: #1e1; }
 
         div.field-table { display: flex; flex-wrap: wrap; flex-direction: row; gap: 0.3em; }
+        div.field-table.disconnected { opacity: 30%; }
         div.one-field { border: 1px solid #333; padding: 4px; border-radius: 6px; text-align: left; }
         div.one-field-error { background: #ff6633; }
     `;
@@ -53,7 +54,7 @@ class ElectricityMetersWidget extends LitElement {
           <div class="one-meter ${meter.data ? "seen" : ""}">${meter.prettyName ?? meter.meterId}</div>
         `)}
         </div>
-        <div class=field-table>
+        <div class="field-table${this.isConnected ? "" : " disconnected"}">
         ${this.fields.map(dataset => html`
           <div class="one-field ${dataset.error ? "one-field-error" : ""}">${dataset.error ? dataset.line : (dataset.obis + ": " + dataset.value + (dataset.unit ? " " + dataset.unit : ""))}</div>
         `)}
