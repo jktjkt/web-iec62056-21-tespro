@@ -212,7 +212,10 @@ class ElectricityMetersWidget extends LitElement {
                         value: res[2],
                         unit: res[4],
                     };
-                    if (res[1] == '0.0.0') {
+                    if (meterId === null && res[1] == '0.0.0') {
+                        meterId = res[2];
+                    }
+                    if (meterId === null && res[1] == '0.0') {
                         meterId = res[2];
                     }
                 }
