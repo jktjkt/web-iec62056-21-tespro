@@ -211,7 +211,7 @@ class ElectricityMetersWidget extends LitElement {
 
     static styles = css`
         div.readout-container { display: flex; flex-direction: column; gap: 1em; width: 100%; }
-        div.readout-container > button { font-size: inherit !important; }
+        div.readout-container > button, div.readout-control > button { font-size: inherit !important; }
 
         div.meter-table { display: flex; flex-wrap: wrap; flex-direction: row; gap: 0.3em; }
         div.one-meter { border: 1px solid black; padding: 4px; border-radius: 6px; text-align: left; }
@@ -221,6 +221,9 @@ class ElectricityMetersWidget extends LitElement {
         div.field-table.disconnected { opacity: 30%; }
         div.one-field { border: 1px solid #333; padding: 4px; border-radius: 6px; text-align: left; }
         div.one-field-error { background: #ff6633; }
+
+        div.readout-control { display: flex; flex-wrap: wrap; flex-direction: row; gap: 0.3em; }
+        div.readout-control > button { flex-grow: 1; }
     `;
 
     render() {
@@ -230,8 +233,11 @@ class ElectricityMetersWidget extends LitElement {
         <!--button @click="${this.doConnectSerial}" ?disabled=${this.isConnected}>Connect via serial</button-->
         <button @click="${this.doConnectBLE}" ?disabled=${this.isConnected}>Connect via BLE</button>
         <button @click="${this.doDisconnect}" ?disabled=${!this.isConnected}>Disconnect</button>
-        <button @click="${this.downloadPackets}"">Download (${this.meters.reduce((acc, meter) => meter.data ? acc + 1 : acc, 0)} fresh readings, ${this.storedReadings.length} total)</button>
-        <button @click="${this.doReadOne}" ?disabled=${!this.isConnected || this.currentlyReading}>Read the meter</button>
+        <button @click="${this.downloadPackets}"">Download (${this.meters.reduce((acc, meter) => meter.data ? acc + 1 : acc, 0)} shown, ${this.storedReadings.length} stored)</button>
+        <div class=readout-control>
+        <button @click="${this.doReadOne}" ?disabled=${!this.isConnected || this.currentlyReading}>▶ Read </button>
+        <button @click="${this.stopReading}" ?disabled=${!this.isConnected || !this.currentlyReading}>⏹ Stop</button>
+        </div>
         <div class="meters-stats ${this.error ? "error" : ""}">${this.error}</div>
         <div class=meter-table>
         ${this.meters.map(meter => html`
@@ -323,6 +329,7 @@ class ElectricityMetersWidget extends LitElement {
             this.portReader.releaseLock();
         }
         this.portReader = null;
+        this.currentlyReading = false;
     }
 
     async serial_write(buf) {
@@ -467,8 +474,12 @@ class ElectricityMetersWidget extends LitElement {
         } finally {
             await this.dropRW();
             await lines;
-            this.currentlyReading = false;
         }
+    }
+
+    async stopReading() {
+        await this.dropRW();
+        this.fields = [];
     }
 
     gotMeterData(meterId, data) {
