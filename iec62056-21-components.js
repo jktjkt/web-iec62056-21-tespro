@@ -136,12 +136,16 @@ class ElectricityMetersWidget extends LitElement {
             for (const c of value) {
                 // console.log(`  RX 0x${c.toString(16)}`);
                 this.rxBuf.push(c);
-                if (c == 0x0a) {
-                    console.log(`<<< ${hexify(this.rxBuf)}`);
-                    const tmp = [...this.rxBuf];
-                    this.rxBuf = [];
-                    yield tmp;
+            }
+
+            while (this.rxBuf.length) {
+                const pos = this.rxBuf.findIndex((c) => c == 0x0a);
+                if (pos == -1) {
+                    break;
                 }
+                const chunk = this.rxBuf.slice(0, pos + 1);
+                this.rxBuf = this.rxBuf.slice(pos + 1);
+                yield chunk;
             }
         }
     }
