@@ -4,6 +4,189 @@ function hexify(buf) {
     return Array.from(buf).map((c) => (c > 15 ? '' : '0') + c.toString(16)).join(' ')
 }
 
+class _BleReader {
+    constructor(port) {
+        this._port = port;
+    }
+
+    async read() {
+        return this._port._rx_promise;
+    }
+
+    async cancel() {
+        if (this._port._rx_promise) {
+            await this._port._reset_promise('cancel', '_BleReader.cancel');
+        }
+    }
+
+    async releaseLock() {
+    }
+};
+
+class _BleWriter {
+    constructor(port) {
+        this._port = port;
+    }
+
+    async write(buf) {
+        while (buf.length) {
+            const size = 20;
+            const chunk = buf.slice(0, size);
+            console.log(`BLE: >>> ${hexify(chunk)}`);
+            await this._port._tx_characteristic.writeValueWithoutResponse(chunk);
+            buf = buf.slice(size);
+        }
+    }
+
+    async close() {
+    }
+
+    async releaseLock() {
+    }
+};
+
+class _BleReadable {
+    constructor(port) {
+        this._reader = new _BleReader(port);
+    }
+
+    getReader() {
+        return this._reader;
+    }
+};
+
+class _BleWritable {
+    constructor(port) {
+        this._writer = new _BleWriter(port);
+    }
+
+    getWriter() {
+        return this._writer;
+    }
+};
+
+class BleSerial extends EventTarget {
+    serviceUUID = 0x18f0;
+    rxUUID = 0x2af0;
+    txUUID = 0x2af1;
+
+    _btDev = null;
+    _service = null;
+    _rx_characteristic = null;
+    _rx_notif = null;
+    _tx_characteristic = null;
+    _rx_promise = null;
+    _rx_resolve = null;
+    _rx_reject = null;
+
+    async open() {
+        console.log('Requesting device...');
+        const options = {
+            // We cannot filter by the service UUID because the Tespro/Zenovate optical head
+            // does not actually advertise that service before we've connected. So, we can either
+            // allow all devices, or filter by a name prefix -- but these names are user-configurable.
+            acceptAllDevices: true,
+            // filters: [
+            //     {namePrefix: 'OP-BT'}
+            // ],
+            optionalServices: [this.serviceUUID],
+        };
+
+        try {
+            this._btDev = await navigator.bluetooth.requestDevice(options);
+            this._btDev.addEventListener('gattserverdisconnected', () => { this._onDisconnected(); });
+            console.log('BLE: Connecting...');
+            await this._btDev.gatt.connect();
+            console.log('BLE: Connected, requesting services...');
+            this._service = await this._btDev.gatt.getPrimaryService(this.serviceUUID);
+            console.log('BLE: requesting RX characteristics...');
+            this._rx_characteristic = await this._service.getCharacteristic(this.rxUUID);
+            console.log('BLE: RX characteristic: ' + this._rx_characteristic);
+            this._rx_notif = await this._rx_characteristic.startNotifications();
+            // BUG: without this start-stop-start cycle, the this._onRx() would be called against the *first*
+            // BleSerial instance indefinitely. Explicitly removing the event listener is not enough,
+            // and neigher is using an AbortController. Unless the *first* BleSerial calls stopNotifications(),
+            // that instance will keep receiving notifications about changes in that characteristic.
+            // It is not enough to call stopNotifications in BlePort.close(), because that one is not called when
+            // the BLE connection drops for some external reason. Also, one cannot call stopNotifications from
+            // an event handler that's connected to 'gattserverdisconnected' because the WebBluetooth actively rejects
+            // that when the BLE/GATT server is not connected. Yay.
+            await this._rx_notif.stopNotifications();
+            this._rx_notif = await this._rx_characteristic.startNotifications();
+            console.log('BLE: RX characteristics: notifications started');
+            this._rx_characteristic.oncharacteristicvaluechanged = (e) => { this._onRx(e); }
+            console.log('BLE: requesting TX characteristics...');
+            this._tx_characteristic = await this._service.getCharacteristic(this.txUUID);
+            this.readable = new _BleReadable(this);
+            this.writable = new _BleWritable(this);
+            await this._reset_promise('init', null);
+            console.log('BLE: All good, connected to ' + this._btDev.name);
+        } catch (error) {
+            await this.close();
+            throw error;
+        }
+    }
+
+    async close() {
+        if (this._btDev && this._btDev.gatt.connected) {
+            console.log('BLE: disconnecting...')
+            await this._btDev.gatt.disconnect();
+            this._btDev = null;
+            console.log('BLE: disconnected')
+        } else {
+            console.log('BLE: Already disconnected');
+        }
+    }
+
+    async _reset_promise(mode, chunk) {
+        if (mode == 'init') {
+            // first time: nothing to do here
+        } else if (mode == 'data') {
+            await this._rx_resolve({value: chunk, done: false});
+        } else if (mode == 'cancel') {
+            // when called from .open(), _rx_resolve might be null
+            if (this._rx_resolve) {
+                await this._rx_resolve({value: undefined, done: true});
+            }
+        // } else if (mode == 'reject') {
+        //     await this._rx_reject(chunk);
+        } else {
+            throw `BleSerial._reset_promise: invalid mode ${mode}`;
+        }
+        this._rx_promise = new Promise((resolve, reject) => {
+            console.log('BLE: _reset_promise: iniside that promise CTOR');
+            this._rx_resolve = resolve;
+            this._rx_reject = reject;
+        });
+    }
+
+    async _onRx() {
+        let v = event.target.value;
+        let chunk = [];
+        for (let i = v.byteOffset; i < v.byteLength; i++) {
+            chunk.push(v.getUint8(i));
+        }
+        console.log(`BLE: <<< ${hexify(chunk)}`);
+        this._reset_promise('data', chunk);
+    }
+
+    async _onDisconnected() {
+        this._reset_promise('cancel', undefined);
+        this._tx_characteristic = null;
+        this._rx_notif = null;
+        this._rx_characteristic = null;
+        this._service = null;
+        this._btDev = null;
+        this.readable = null;
+        this.writable = null;
+        this._rx_buf = null;
+        this._rx_promise = null;
+        this._rx_resolve = null;
+        this._rx_reject = null;
+        this.dispatchEvent(new Event('disconnect'));
+    }
+};
+
 class ElectricityMetersWidget extends LitElement {
     static properties = {
         error: { type: String },
@@ -44,7 +227,8 @@ class ElectricityMetersWidget extends LitElement {
         return html`
         <div class=readout-container>
         <button @click=${this.clearStorage} ?disabled=${this.packetCount == 0}>Clear persistent storage</button>
-        <button @click="${this.doConnect}" ?disabled=${this.isConnected}>Connect</button>
+        <button @click="${this.doConnectSerial}" ?disabled=${this.isConnected}>Connect via serial</button>
+        <button @click="${this.doConnectBLE}" ?disabled=${this.isConnected}>Connect via BLE</button>
         <button @click="${this.doDisconnect}" ?disabled=${!this.isConnected}>Disconnect</button>
         <button @click="${this.downloadPackets}"">Download (${this.meters.reduce((acc, meter) => meter.data ? acc + 1 : acc, 0)} fresh readings, ${this.storedReadings.length} total)</button>
         <button @click="${this.doReadOne}" ?disabled=${!this.isConnected || this.currentlyReading}>Read the meter</button>
@@ -71,7 +255,7 @@ class ElectricityMetersWidget extends LitElement {
         a.click();
     }
 
-    async doConnect() {
+    async doConnectSerial() {
         this.error = "";
         this.fields = [];
         try {
@@ -82,6 +266,26 @@ class ElectricityMetersWidget extends LitElement {
                 this.isConnected = false;
                 this.port = null;
                 this.error = 'Serial port disconnected';
+                console.log(this.error);
+            });
+        } catch (error) {
+            this.isConnected = false;
+            this.error = error;
+            console.log(this.error);
+        }
+    }
+
+    async doConnectBLE() {
+        this.error = "";
+        this.fields = [];
+        try {
+            this.port = new BleSerial();
+            await this.port.open();
+            this.isConnected = true;
+            this.port.addEventListener('disconnect', (event) => {
+                this.isConnected = false;
+                this.port = null;
+                this.error = 'BLE port disconnected';
                 console.log(this.error);
             });
         } catch (error) {
