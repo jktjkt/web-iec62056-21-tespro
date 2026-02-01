@@ -173,10 +173,8 @@ class ElectricityMetersWidget extends LitElement {
             const identification = /^\/[A-Z]{2}[A-Za-z]([A-I0-9])(\\.)*([^\/!]+)\r\n$/
             let res;
             if (!(res = identification.exec(rx))) {
-                console.log('Cannot identify meter');
                 throw `Cannot identify meter: ${rx}`;
             }
-            console.log(res);
 
             const new_baud_mode = res[1];
             const meterTypeId = res[3];
@@ -208,7 +206,6 @@ class ElectricityMetersWidget extends LitElement {
                 const dataset_re = /^([^()?!]{0,16})\(([^()*\/!]{0,32})(\*([^()!/]{0,16}))?\)\r\n$/;
                 if (!(res = dataset_re.exec(line))) {
                     console.log(`!!! Cannot parse dataset line ${line}`);
-                    console.log(res);
                     dataset = {
                         error: true,
                         line: line,
@@ -236,7 +233,6 @@ class ElectricityMetersWidget extends LitElement {
                         break;
                     }
                     for (const c of value) {
-                        // console.log(`  extra RX 0x${c.toString(16)}`);
                         this.rxBuf.push(c);
                     }
                 }
