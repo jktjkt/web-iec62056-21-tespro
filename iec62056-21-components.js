@@ -486,7 +486,7 @@ class ElectricityMetersWidget extends LitElement {
         let meter = null;
         if (meter = this.meters.find((r) => r.meterId == meterId)) {
             meter.data = data;
-        } else {
+        } else if (meterId) {
             this.meters = [...this.meters, {meterId: meterId, prettyName: null, data: data}];
         }
         this.storedReadings.push(data);
