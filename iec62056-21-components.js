@@ -73,6 +73,7 @@ class ElectricityMetersWidget extends LitElement {
 
     async doConnect() {
         this.error = "";
+        this.fields = [];
         try {
             this.port = await navigator.serial.requestPort();
             await this.port.open({baudRate: 9600}); // we rely on autobaude anyway
@@ -155,6 +156,7 @@ class ElectricityMetersWidget extends LitElement {
     }
 
     async doReadOne() {
+        this.error = "";
         this.currentlyReading = true;
         this.fields = [];
         this.portWriter = this.port.writable.getWriter();
