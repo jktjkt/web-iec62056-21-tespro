@@ -1,0 +1,64 @@
+substitutions:
+  # UUIDs which are compatible with the Nordic UART Service (NUS)
+  # ble_uart_service: "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+  # ble_uart_characteristic_rx: "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+  # ble_uart_characteristic_tx: "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+  # Tespro/Zenovate OP-BT/OP-BTS probes
+  ble_uart_service: "000018f0-0000-1000-8000-00805f9b34fb"
+  ble_uart_characteristic_rx: "00002af0-0000-1000-8000-00805f9b34fb"
+  ble_uart_characteristic_tx: "00002af1-0000-1000-8000-00805f9b34fb"
+
+esphome:
+  name: atomlite
+  platformio_options:
+    upload_speed: 1500000
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+  level: VERBOSE
+
+uart:
+  id: gpio_uart_0
+  tx_pin: 33
+  rx_pin: 23
+  baud_rate: 9600
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    after:
+      timeout: 30ms
+      bytes: 20
+    sequence:
+      - lambda: |-
+          UARTDebug::log_string(direction, bytes);
+          if (direction == UART_DIRECTION_RX) {
+            esphome::bytebuffer::ByteBuffer buf(bytes.size());
+            for (size_t i = 0; i < bytes.size(); i++) {
+              buf.put(bytes[i]);
+            }
+            id(ble_uart_rx).set_value(buf);
+            id(ble_uart_rx).notify();
+            ESP_LOGD("uart_ble", "UART->BLE: %d bytes", bytes.size());
+          }
+
+esp32_ble_server:
+  services:
+    - uuid: ${ble_uart_service}
+      characteristics:
+        - uuid: ${ble_uart_characteristic_rx}
+          id: ble_uart_rx
+          notify: true
+        
+        - uuid: ${ble_uart_characteristic_tx}
+          id: ble_uart_tx
+          write: true
+          write_no_response: true
+          on_write:
+            then:
+              - lambda: |-
+                  ESP_LOGD("uart_ble", "BLE->UART: %d bytes", x.size());
+                  id(gpio_uart_0).write_array(x.data(), x.size());
