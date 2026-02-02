@@ -7,3 +7,8 @@ On iPhone, use [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1
 Tested with the [ZPA AM363.D.0E](https://www.premereni.cz/cs/dulezite-informace/montaz-elektromeru/prehled-instalovanych-elektromeru/am-363/) and [ZPA ZE310.DU](https://www.premereni.cz/cs/dulezite-informace/montaz-elektromeru/prehled-instalovanych-elektromeru/ze310du/) in the [PRE Distribuce area](https://eru.gov.cz/en/who-are-my-supplier-and-distributor) in Czechia.
 
 Some meters do not report anything, e.g., a more recent [AM375.D.0E](https://www.premereni.cz/cs/dulezite-informace/montaz-elektromeru/prehled-instalovanych-elektromeru/zpa-am375/) with HAN (RS485) port and a radio interface for 15-minute remote readout.
+
+## How to use this
+
+Open [the website](https://jktjkt.github.io/web-iec62056-21-tespro/), connect your BLE optical probe (autobaud required), and read the meters.
+If you are unhappy with the predefined list of meters, fork this and modify the list in `index.html`.
