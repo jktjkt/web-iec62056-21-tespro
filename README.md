@@ -10,5 +10,7 @@ Some meters do not report anything, e.g., a more recent [AM375.D.0E](https://www
 
 ## How to use this
 
+![Demo](doc/2026-02-02-iPhone.webp "Running on iPhone")
+
 Open [the website](https://jktjkt.github.io/web-iec62056-21-tespro/), connect your BLE optical probe (autobaud required), and read the meters.
 If you are unhappy with the predefined list of meters, fork this and modify the list in `index.html`.
